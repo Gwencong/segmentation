@@ -61,13 +61,8 @@ python3 deepstream/deepstream_segmentation.py
 &emsp;&emsp;根据PaddleSeg提供的模型性能测试结果，综合考虑选择了四种算法：Segformer-B、Deeplabv3+、FCN-HRNetW18、PP-Lite-Seg-B，并在Jetson Xavier NX上使用分别使用TensorRT python API和DeepStream测试了在输入为720×1280×3尺寸情况下，其速度和显存消耗，其结果如下表所示，综合二者拟采用FCN-HRNetW18，最终算法使用那种需要根据算法在实际分割数据上的表现而定。  
 
 <style>
-  
-.center 
-{
-  width: auto;
-  display: table;
-  margin-left: auto;
-  margin-right: auto;
+table {
+margin: auto;
 }
 </style>
 
