@@ -83,7 +83,7 @@ python3 deepstream/deepstream_segmentation.py
 
 </div>
 
-### 4. 模型下载
+## 4. 模型下载
 &emsp;&emsp;注意：供下载的模型仅用15张图片训练，精度很差，仅供参考，TensorRT的权重文件仅适用于Jetson Xavier NX上，TensorRT 8.0.1.6 版本
 
 <p align="center"><font face="黑体" size=2.>表3 模型文件下载</font></p>
@@ -92,7 +92,7 @@ python3 deepstream/deepstream_segmentation.py
 
 |           | Segformer-B | Deeplabv3+ | FCN-HRNetW18 | PP-Lite-Seg-B |
 |  :----:   | :---------: | :-------: | :----------: | :-----------: |
-|  ONNX |     [ckpt](https://drive.google.com/file/d/1IzlahUU26lI-LaAAitLeYXPESh4z4uRO/view?usp=sharing)(107MB)     |    [ckpt](https://drive.google.com/file/d/11BnttuKZoxMgJnc0WZIpJQj5TYz1JnOB/view?usp=sharing)(105MB)    |      [ckpt](https://drive.google.com/file/d/17j_PJRIZHqjahCNgMKTwkmIX2_00WdmC/view?usp=sharing) [ckpt-dynamic](https://drive.google.com/file/d/15fII64YGDXhbBDEXJ9dcylluY5_2i5CF/view?usp=sharing)(38MB)      |      [ckpt](https://drive.google.com/file/d/1YYVCeMbt6sAXYlSFM996vfvBGczm26hK/view?usp=sharing)(48MB)      |
+|  ONNX |     [ckpt](https://drive.google.com/file/d/1IzlahUU26lI-LaAAitLeYXPESh4z4uRO/view?usp=sharing)(107MB)     |    [ckpt](https://drive.google.com/file/d/11BnttuKZoxMgJnc0WZIpJQj5TYz1JnOB/view?usp=sharing)(105MB)    |      [ckpt](https://drive.google.com/file/d/17j_PJRIZHqjahCNgMKTwkmIX2_00WdmC/view?usp=sharing)&#124;[ckpt-dynamic](https://drive.google.com/file/d/15fII64YGDXhbBDEXJ9dcylluY5_2i5CF/view?usp=sharing)(38MB)      |      [ckpt](https://drive.google.com/file/d/1YYVCeMbt6sAXYlSFM996vfvBGczm26hK/view?usp=sharing)(48MB)      |
 | TensorRT|      [ckpt](https://drive.google.com/file/d/1-puwvDEvU9_9IilhMBaSNTwpFoYh2Fvu/view?usp=sharing)(68MB)    |     [ckpt](https://drive.google.com/file/d/1wrU6ciUNA0euWrrf3b8I8Rxgj9PYmt08/view?usp=sharing)(56.6MB)     |     [ckpt](https://drive.google.com/file/d/19V7H_Ws3SZ6sDMBBfE8AEAWv-j2qr9te/view?usp=sharing)(31MB)      |      [ckpt](https://drive.google.com/file/d/1RGh59r8vAqWQQNcUMAJjLAKyAhSNJM4v/view?usp=sharing)(25MB)     |
 
 </div>
