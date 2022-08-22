@@ -1,4 +1,6 @@
 # Segmentation with TensorRT and DeepStream
+<div align=center><img src='output/out_trt_fuse.jpg' width=427 height=240></div>
+
 ## 1. 主要内容
 &emsp;&emsp;代码主要内容为对于分割模型的onnx推理和TRT导出与推理的示例  
 
