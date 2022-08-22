@@ -1,3 +1,4 @@
+import json
 import cv2
 import numpy as np
 import tensorrt as trt
@@ -135,22 +136,34 @@ def get_contour_approx(pred,img,visual=False):
         approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
     '''
     h,w = pred.shape[:2]
-    approxs = []
+    approxs = {i:[] for i in classes[:3]}
     for i in range(3):
         mask = np.where(pred==i,0,255).astype(np.uint8)
         contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
-        areas = [cv2.contourArea(contour) for contour in contours]
-        indexes = [j for j,area in enumerate(areas) if 0.01<area/(h*w)<0.8]
-        contour = contours[indexes[0]]
-        epsilon = 0.005 * cv2.arcLength(contour, True)
-        approx = cv2.approxPolyDP(contour,epsilon,True)
-        # approx = cv2.convexHull(contour)
-        approxs.append(approx)
-        if visual:
-            cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
+        if contours:
+            areas = [cv2.contourArea(contour) for contour in contours]
+            areas_ids = np.array([(j,area) for j,area in enumerate(areas) if 0.01<area/(h*w)<0.8]) # filter
+            areas = areas_ids[:,1]
+            indexes = areas_ids[:,0]
+            idx = int(indexes[np.argmax(areas)]) 
+            contour = contours[idx] # select contour with max area 
+            epsilon = 0.005 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour,epsilon,True) # smoothing
+            # approx = cv2.convexHull(contour)
+            approxs[classes[i]] = approx.reshape(-1,2).tolist() if isinstance(approx,np.ndarray) else approx
+            if visual:
+                cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
+        else:
+            print(f'no contour is found for class `{classes[i]}`')
     if visual:
         cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
     return approxs
+
+def result2json(data,file='seg.json'):
+    assert file.endswith('.json'),f'invalid file name `{file}`'
+    with open(file,'w',encoding='utf-8') as f:
+        json.dump(data,f,indent=2,ensure_ascii=False)
+    print(f'segment result has been saved to `{file}`')
 
 
 def infer_trt(img_path,model_path):
@@ -160,7 +173,8 @@ def infer_trt(img_path,model_path):
     model.warmup(5)
     mask,color_mask = model.inference(img)
 
-    approxs = get_contour_approx(mask,img,visual=True)
+    approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    result2json(approxs,'output/seg_result.json')       # save result to json file
     
     img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
     cv2.imwrite('output/out_trt_mask.jpg',color_mask)
