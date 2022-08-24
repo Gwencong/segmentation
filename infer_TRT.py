@@ -101,7 +101,7 @@ class TRT_Infer():
         return img
 
     @Timer(10)
-    def inference(self,im):
+    def inference(self,im,logits=False):
         # preprocess
         img = self.preprocess(im, self.inputs[0].host)
         # Transfer input data to the GPU.
@@ -115,15 +115,18 @@ class TRT_Infer():
         # Return only the host outputs.
         model_out = self.outputs[0].host
         # postprocess
-        mask,color_mask = self.postprocess(model_out, img.shape)
+        mask,color_mask = self.postprocess(model_out, img.shape, logits)
         return mask,color_mask
     
-    def postprocess(self,model_out,shape):
+    def postprocess(self,model_out,shape,logits=False):
         # 后处理, argmax获取每个像素的预测类别
         b,c,h,w = shape
-        pred = model_out.reshape(b,self.num_classes,h,w)[0]
-        pred = np.argmax(pred,axis=0).astype(np.int64)          # [H,W]
-        color_pred = train_id_to_color[pred].astype(np.uint8)   # [H,W,3]
+        pred = model_out.reshape(b,self.num_classes,h,w)[0]         # [4,H,W]
+        if not logits:
+            pred = np.argmax(pred,axis=0).astype(np.int64)          # [H,W]
+            color_pred = train_id_to_color[pred].astype(np.uint8)   # [H,W,3]
+        else:
+            color_pred = None
         return pred, color_pred
 
 
@@ -167,6 +170,14 @@ def result2json(data,file='seg.json'):
 
 
 def infer_trt(img_path,model_path):
+    '''单张图片推理
+    
+    Arguments:
+        img_path: 输入图片文件路径
+        model_path: TensorRT模型文件路径
+    Returns:
+        None
+    '''
     img = cv2.imread(img_path)
     input_shape = [1,3,img.shape[0],img.shape[1]]
     model = TRT_Infer(engine_path=model_path,shape=input_shape)
@@ -179,10 +190,52 @@ def infer_trt(img_path,model_path):
     img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
     cv2.imwrite('output/out_trt_mask.jpg',color_mask)
     cv2.imwrite('output/out_trt_fuse.jpg',img)
+
+def infer_trt_multi(imgs,model_path,mode='mean'):
+    '''多张图片推理
+
+    Arguments:
+        imgs: 输入图片的list, 每个元素是一个图片数组, 尺寸必须相同
+        model_path: TensorRT模型文件路径
+        mode: 多帧图片推理结果的处理方式, mean: 取平均, max: 取最大
+    Returns:
+        None
+    '''
+    assert mode in ['mean','max'],"Argument `mode` invalid, should one of ['mean','max']"
+
+    # model init
+    img0 = imgs[0]
+    input_shape = [1,3,img0.shape[0],img0.shape[1]]
+    model = TRT_Infer(engine_path=model_path,shape=input_shape)
+    model.warmup(5)
+
+    # inference
+    masks = []
+    for img in imgs:
+        mask,_ = model.inference(img,logits=True)           # [4,H,W]
+        masks.append(mask)
+    mask = np.mean(masks,axis=0) if mode == 'mean' else np.max(masks,axis=0)    # [H,W]
+    mask = np.argmax(mask,axis=0).astype(np.int64)          # [H,W]
+    color_mask = train_id_to_color[mask].astype(np.uint8)   # [H,W,3]
+
+    approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    result2json(approxs,'output/seg_result.json')       # save result to json file
     
+    img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
+    cv2.imwrite('output/out_trt_mask.jpg',color_mask)
+    cv2.imwrite('output/out_trt_fuse.jpg',img)
+
 
 
 if __name__ == "__main__":
+    # # 测试范例1: 单张图片推理
+    # img_path = 'data/test.jpg'
+    # model_path = 'weights/fcn_hrnetw18.trt'
+    # infer_trt(img_path,model_path)
+
+    # 测试范例2: 多张图片推理
     img_path = 'data/test.jpg'
-    model_path = 'weights/deeplabv3p.trt'
-    infer_trt(img_path,model_path) 
+    img = cv2.imread(img_path)
+    imgs = [img for _ in range(5)]
+    model_path = 'weights/fcn_hrnetw18.trt'
+    infer_trt_multi(imgs,model_path,mode='mean')
