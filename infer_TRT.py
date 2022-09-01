@@ -185,6 +185,7 @@ def infer_trt(img_path,model_path):
     mask,color_mask = model.inference(img)
 
     approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    approxs.update(**{'imgHeight':img.shape[0],'imgWidth':img.shape[1]})
     result2json(approxs,'output/seg_result.json')       # save result to json file
     
     img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
@@ -219,6 +220,7 @@ def infer_trt_multi(imgs,model_path,mode='mean'):
     color_mask = train_id_to_color[mask].astype(np.uint8)   # [H,W,3]
 
     approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    approxs.update(**{'imgHeight':img0.shape[0],'imgWidth':img0.shape[1]})
     result2json(approxs,'output/seg_result.json')       # save result to json file
     
     img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
