@@ -141,7 +141,7 @@ def get_contour_approx(pred,img,visual=False):
     h,w = pred.shape[:2]
     approxs = {i:[] for i in classes[:3]}
     for i in range(3):
-        mask = np.where(pred==i,0,255).astype(np.uint8)
+        mask = np.where(pred==i,255,0).astype(np.uint8)
         contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
         if contours:
             areas = [cv2.contourArea(contour) for contour in contours]
