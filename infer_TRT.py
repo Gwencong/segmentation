@@ -146,8 +146,12 @@ def get_contour_approx(pred,img,visual=False):
         if contours:
             areas = [cv2.contourArea(contour) for contour in contours]
             areas_ids = np.array([(j,area) for j,area in enumerate(areas) if 0.01<area/(h*w)<0.8]) # filter
-            areas = areas_ids[:,1]
-            indexes = areas_ids[:,0]
+            if len(areas_ids) == 0:
+                print('Warning: contour areas is out of range, the segmentation result may be incorrect')
+                indexes = np.arange(len(areas))
+            else:
+                areas = areas_ids[:,1]
+                indexes = areas_ids[:,0]
             idx = int(indexes[np.argmax(areas)]) 
             contour = contours[idx] # select contour with max area 
             epsilon = 0.005 * cv2.arcLength(contour, True)
