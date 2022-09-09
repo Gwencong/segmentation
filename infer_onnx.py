@@ -3,8 +3,8 @@ import onnx
 import onnxruntime
 import numpy as np
 
-colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
-classes = ['background','left baffle','right baffle','step']
+colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[255,255,0], [0, 0, 0]]
+classes = ['left baffle','right baffle','step','floor plate','background',]
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
 

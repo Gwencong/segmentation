@@ -8,8 +8,8 @@ import pycuda.driver as cuda
 from pathlib import Path
 from utils.utils import Timer,colorstr
 
-colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
-classes = ['left baffle','right baffle','step','background']
+colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
+classes = ['left baffle','right baffle','step','floor plate','background']
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
 
@@ -27,7 +27,7 @@ class HostDeviceMem(object):
 
 
 class TRT_Infer():
-    def __init__(self,engine_path,shape=[1,3,640,640],num_classes=4) -> None:
+    def __init__(self,engine_path,shape=[1,3,640,640],num_classes=5) -> None:
         self.shape = shape              # 模型的输入图片形状
         self.num_classes = num_classes  # 类别数量
         self.logger = trt.Logger(trt.Logger.WARNING)    # tensorrt日志记录器
