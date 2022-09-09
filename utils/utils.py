@@ -1,4 +1,6 @@
+import cv2
 import sys
+import json
 import time
 import logging
 import platform
@@ -15,7 +17,10 @@ except Exception as e:
 
 
 SEG_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 0, 0]]
-
+colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
+classes = ['left baffle','right baffle','step','background']
+train_id_to_color = np.array(colors)
+train_id_to_color = np.ascontiguousarray(train_id_to_color)
 
 class Timer(object):
     def __init__(self,iters=10) -> None:
@@ -183,3 +188,85 @@ def colorstr(*input):
               'bold': '\033[1m',
               'underline': '\033[4m'}
     return ''.join(colors[x] for x in args) + f'{string}' + colors['end']
+
+def get_contour_approx(pred,img,visual=False):
+    '''根据预测的mask获取扶梯左右挡板、梯路的轮廓\n
+    Args:
+        pred: 预测的mask, 尺寸: [H,W], 每个像素的值为0-3, 对于类别id
+        img: 原图, 可视化用
+    Return: 
+        approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
+    '''
+    h,w = pred.shape[:2]
+    approxs = {i:[] for i in classes[:3]}
+    for i in range(3):
+        mask = np.where(pred==i,255,0).astype(np.uint8)
+        # cv2.imshow('test',mask)
+        # cv2.waitKey(0)
+        contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
+        if contours:
+            
+            # if contours number greater than 1, filter according to contour area
+            areas = [cv2.contourArea(contour) for contour in contours]
+            areas_ids = np.array([(j,area) for j,area in enumerate(areas) if 0.01<area/(h*w)<0.8]) # filter
+            if len(areas_ids) == 0:
+                print('Warning: contour areas is out of range, the segmentation result may be incorrect')
+                indexes = np.arange(len(areas))
+            else:
+                areas = areas_ids[:,1]
+                indexes = areas_ids[:,0]
+            idx = int(indexes[np.argmax(areas)]) 
+            
+            contour = contours[idx] # select contour with max area 
+            epsilon = 0.005 * cv2.arcLength(contour, True)
+            approx = cv2.approxPolyDP(contour,epsilon,True) # smoothing
+            # approx = cv2.convexHull(contour)
+            approxs[classes[i]] = approx.reshape(-1,2).tolist() if isinstance(approx,np.ndarray) else approx
+            if visual:
+                cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
+        else:
+            print(f'no contour is found for class `{classes[i]}`')
+    if visual:
+        cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
+    return approxs
+
+def result2json(data,file='seg.json'):
+    assert file.endswith('.json'),f'invalid file name `{file}`'
+    with open(file,'w',encoding='utf-8') as f:
+        json.dump(data,f,indent=2,ensure_ascii=False)
+    print(f'segment result has been saved to `{file}`')
+
+
+
+def get_img_from_video(vid_path,frame_id=0,save_path=None):
+    cap = cv2.VideoCapture(vid_path)
+
+    frame_width = int(cap.get(3))
+    frame_height = int(cap.get(4))
+    frame_count = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    fps = cap.get(5)
+    print('frame width: {}\nframe height: {}\nframe count {}\nFPS: {}'.format(frame_width,frame_height,frame_count,fps))
+    count = 0
+
+    if cap.isOpened():
+        ret,frame = cap.read()
+    else:
+        ret = False 
+    while ret:
+        if count == frame_id:
+            break
+        ret,frame  = cap.read()
+        if frame is not None: 
+            pass
+        count+=1
+    cap.release()
+    if save_path and frame is not None:
+        cv2.imwrite(save_path,frame)
+        print('frame {} has been save to `{}`'.format(frame_id,save_path))
+
+    return frame
+
+if __name__ == "__main__":
+    vid_path = r"D:\my file\project\扶梯项目\鲁邦通数据\8mm_20220427163046407.mp4"
+    save_path = r"data/test.jpg"
+    get_img_from_video(vid_path,save_path=save_path,frame_id=14)

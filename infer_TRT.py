@@ -8,8 +8,10 @@ import pycuda.driver as cuda
 from pathlib import Path
 from utils.utils import Timer,colorstr
 
-colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
-classes = ['left baffle','right baffle','step','background']
+from utils.utils import get_contour_approx,result2json
+
+colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
+classes = ['background','left baffle','right baffle','floor plate','step']
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
 
@@ -128,45 +130,6 @@ class TRT_Infer():
         else:
             color_pred = None
         return pred, color_pred
-
-
-def get_contour_approx(pred,img,visual=False):
-    '''根据预测的mask获取扶梯左右挡板、梯路的轮廓\n
-    Args:
-        pred: 预测的mask, 尺寸: [H,W], 每个像素的值为0-3, 对于类别id
-        img: 原图, 可视化用
-    Return: 
-        approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
-    '''
-    h,w = pred.shape[:2]
-    approxs = {i:[] for i in classes[:3]}
-    for i in range(3):
-        mask = np.where(pred==i,0,255).astype(np.uint8)
-        contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
-        if contours:
-            areas = [cv2.contourArea(contour) for contour in contours]
-            areas_ids = np.array([(j,area) for j,area in enumerate(areas) if 0.01<area/(h*w)<0.8]) # filter
-            areas = areas_ids[:,1]
-            indexes = areas_ids[:,0]
-            idx = int(indexes[np.argmax(areas)]) 
-            contour = contours[idx] # select contour with max area 
-            epsilon = 0.005 * cv2.arcLength(contour, True)
-            approx = cv2.approxPolyDP(contour,epsilon,True) # smoothing
-            # approx = cv2.convexHull(contour)
-            approxs[classes[i]] = approx.reshape(-1,2).tolist() if isinstance(approx,np.ndarray) else approx
-            if visual:
-                cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
-        else:
-            print(f'no contour is found for class `{classes[i]}`')
-    if visual:
-        cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
-    return approxs
-
-def result2json(data,file='seg.json'):
-    assert file.endswith('.json'),f'invalid file name `{file}`'
-    with open(file,'w',encoding='utf-8') as f:
-        json.dump(data,f,indent=2,ensure_ascii=False)
-    print(f'segment result has been saved to `{file}`')
 
 
 def infer_trt(img_path,model_path):
