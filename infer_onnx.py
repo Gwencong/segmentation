@@ -6,7 +6,7 @@ import numpy as np
 from utils.utils import get_contour_approx,result2json
 
 colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
-classes = ['background','left baffle','right baffle','floor plate','step']
+classes = ['left baffle','right baffle','step','floor plate','background']
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
 
@@ -99,18 +99,17 @@ def infer_onnx_video(video_path,onnx_path):
 if __name__ == "__main__":
 
 
-    # img_path = "data/test.jpg"
-    # img_path = "D:/my file/project/扶梯项目/code/OpticalFlow-DirectionJudge/data/test.jpg"
-    # onnx_path = "weights/fcn_hrnetw18.onnx"
-    # infer_onnx(img_path,onnx_path)
+    img_path = "data/test.jpg"
+    onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
+    infer_onnx(img_path,onnx_path)
 
     # vid_path = r"data\down.mp4"
-    vid_path = r"D:\my file\project\扶梯项目\自采集数据\50b6d76b9aa1ef95b5704a29d835f2b1.mp4"
-    onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
-    infer_onnx_video(vid_path,onnx_path)
+    # vid_path = r"D:\my file\project\扶梯项目\自采集数据\50b6d76b9aa1ef95b5704a29d835f2b1.mp4"
+    # onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
+    # infer_onnx_video(vid_path,onnx_path)
 
     # img_path = r'D:\my file\project\扶梯项目\code\OpticalFlow-DirectionJudge\data\test.jpg'
-    # onnx_path = r"D:\my file\project\扶梯项目\测试\图像分割\code\weights\fcn_hrnetw18.onnx"
+    # onnx_path = r"D:\my file\project\扶梯项目\code\segmentation\weights\fcn_hrnetw18.onnx"
     # infer_onnx(img_path,onnx_path)
 
 

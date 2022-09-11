@@ -18,7 +18,7 @@ except Exception as e:
 
 SEG_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 0, 0]]
 colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
-classes = ['left baffle','right baffle','step','background']
+classes = ['left baffle','right baffle','step','floor plate','background']
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
 
@@ -198,8 +198,8 @@ def get_contour_approx(pred,img,visual=False):
         approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
     '''
     h,w = pred.shape[:2]
-    approxs = {i:[] for i in classes[:3]}
-    for i in range(3):
+    approxs = {i:[] for i in classes[:4]}
+    for i in range(4):
         mask = np.where(pred==i,255,0).astype(np.uint8)
         # cv2.imshow('test',mask)
         # cv2.waitKey(0)
