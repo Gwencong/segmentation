@@ -139,8 +139,8 @@ def get_contour_approx(pred,img,visual=False):
         approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
     '''
     h,w = pred.shape[:2]
-    approxs = {i:[] for i in classes[:3]}
-    for i in range(3):
+    approxs = {i:[] for i in classes[:4]}
+    for i in range(4):
         mask = np.where(pred==i,255,0).astype(np.uint8)
         contours,hierarchy = cv2.findContours(mask,cv2.RETR_LIST,cv2.CHAIN_APPROX_SIMPLE)
         if contours:
