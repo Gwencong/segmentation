@@ -188,11 +188,12 @@ def infer_trt(img_path,model_path):
     model.warmup(5)
     mask,color_mask = model.inference(img)
 
-    approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    vis_img = img.copy()
+    approxs = get_contour_approx(mask,vis_img,visual=True)  # get contour points of roi area from segment result
     approxs.update(**{'imgHeight':img.shape[0],'imgWidth':img.shape[1]})
     result2json(approxs,'output/seg_result.json')       # save result to json file
     
-    img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
+    img = cv2.addWeighted(vis_img,0.7,color_mask,0.3,0)
     cv2.imwrite('output/out_trt_mask.jpg',color_mask)
     cv2.imwrite('output/out_trt_fuse.jpg',img)
 
@@ -223,11 +224,12 @@ def infer_trt_multi(imgs,model_path,mode='mean'):
     mask = np.argmax(mask,axis=0).astype(np.int64)          # [H,W]
     color_mask = train_id_to_color[mask].astype(np.uint8)   # [H,W,3]
 
-    approxs = get_contour_approx(mask,img,visual=True)  # get contour points of roi area from segment result
+    vis_img = img0.copy()
+    approxs = get_contour_approx(mask,vis_img,visual=True)  # get contour points of roi area from segment result
     approxs.update(**{'imgHeight':img0.shape[0],'imgWidth':img0.shape[1]})
     result2json(approxs,'output/seg_result.json')       # save result to json file
     
-    img = cv2.addWeighted(img,0.7,color_mask,0.3,0)
+    img = cv2.addWeighted(vis_img,0.7,color_mask,0.3,0)
     cv2.imwrite('output/out_trt_mask.jpg',color_mask)
     cv2.imwrite('output/out_trt_fuse.jpg',img)
 
