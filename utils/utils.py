@@ -1,11 +1,14 @@
+import os
 import cv2
 import sys
 import json
+import math
 import time
 import logging
 import platform
 import numpy as np
 from pathlib import Path
+from skimage.draw import line
 
 try:
     import gi
@@ -236,6 +239,130 @@ def result2json(data,file='seg.json'):
         json.dump(data,f,indent=2,ensure_ascii=False)
     print(f'segment result has been saved to `{file}`')
 
+def loadJson(file):
+    assert os.path.exists(file),f'file not exist: `{file}`'
+    with open(file,'r',encoding='utf-8') as f:
+        data = json.load(f)
+    return data
+
+class clockwise_angle_and_distance():
+    '''
+    A class to tell if point is clockwise from origin or not.
+    This helps if one wants to use sorted() on a list of points.
+
+    Parameters
+    ----------
+    point : ndarray or list, like [x, y]. The point "to where" we g0
+    self.origin : ndarray or list, like [x, y]. The center around which we go
+    refvec : ndarray or list, like [x, y]. The direction of reference
+
+    use: 
+        instantiate with an origin, then call the instance during sort
+    reference: 
+    https://stackoverflow.com/questions/41855695/sorting-list-of-two-dimensional-coordinates-by-clockwise-angle-using-python
+
+    Returns
+    -------
+    angle
+    
+    distance
+    
+
+    '''
+    def __init__(self, origin):
+        self.origin = origin
+
+    def __call__(self, point, refvec = [0, 1]):
+        if self.origin is None:
+            raise NameError("clockwise sorting needs an origin. Please set origin.")
+        # Vector between point and the origin: v = p - o
+        vector = [point[0]-self.origin[0], point[1]-self.origin[1]]
+        # Length of vector: ||v||
+        lenvector = np.linalg.norm(vector[0] - vector[1])
+        # If length is zero there is no angle
+        if lenvector == 0:
+            return -math.pi, 0
+        # Normalize vector: v/||v||
+        normalized = [vector[0]/lenvector, vector[1]/lenvector]
+        dotprod  = normalized[0]*refvec[0] + normalized[1]*refvec[1] # x1*x2 + y1*y2
+        diffprod = refvec[1]*normalized[0] - refvec[0]*normalized[1] # x1*y2 - y1*x2
+        angle = math.atan2(diffprod, dotprod)
+        # Negative angles represent counter-clockwise angles so we need to 
+        # subtract them from 2*pi (360 degrees)
+        if angle < 0:
+            return 2*math.pi+angle, lenvector
+        # I return first the angle because that's the primary sorting criterium
+        # but if two vectors have the same angle then the shorter distance 
+        # should come first.
+        return angle, lenvector
+
+class ContourParse():
+    def __init__(self, contour, imgH=720, imgW=1280) -> None:
+        self.contour = np.asarray(contour).reshape(-1,2)
+        self.imgH = imgH
+        self.imgW = imgW
+        self.pts_num = len(self.contour)
+
+    def split_LR(self):
+        top_id = np.argmin(self.contour[...,1])
+        bot_id = np.argmax(self.contour[...,1])
+        max_id = np.max([top_id,bot_id])
+        min_id = np.min([top_id,bot_id])
+        cnt1_id = list(range(min_id,max_id+1))
+        cnt2_id = list(range(max_id,self.pts_num))+list(range(0,min_id))
+        cnt1 = self.contour[cnt1_id,...]
+        cnt2 = self.contour[cnt2_id,...]
+        if cnt1[-2][0]<cnt1[1][0]:
+            left_cnt,right_cnt = cnt1,cnt2
+        else:
+            left_cnt,right_cnt = cnt2,cnt1
+        return left_cnt,right_cnt
+
+    def split_TB(self):
+        pass
+
+    def visual(self,contour=None,img=None):
+        if contour is None:
+            contour = self.contour
+        mask = np.zeros([self.imgH,self.imgW,3]) if img is None else img
+        cv2.fillPoly(mask,[contour],color=(0,255,0))
+        try:
+            cv2.imshow('visual',mask)
+            cv2.waitKey(0)
+        except:
+            cv2.imwrite('visual.jpg',mask)
+        return mask
+
+def get_cross_pts(contour, pt1, pt2):
+    cross_pts = []
+    for pt in zip(*line(*pt1, *pt2)):
+        if cv2.pointPolygonTest(contour, pt, False) == 0:  # 若点在轮廓上
+            cross_pts.append(pt)
+    cross_pts = np.array(cross_pts).reshape(-1,2)     
+    if len(cross_pts)>2:
+        max_id = np.argmax(cross_pts[...,0])
+        min_id = np.argmin(cross_pts[...,0])
+        cross_pts = cross_pts[[min_id,max_id],...]
+    return cross_pts
+
+def get_larger_contour(area_cnts:dict):
+    assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
+    
+    baffle_l = np.array(area_cnts[classes[0]])
+    baffle_r = np.array(area_cnts[classes[1]])
+    step = np.array(area_cnts[classes[2]])
+    cnts = np.vstack((baffle_l,baffle_r,step))
+
+    center_pt = np.array(cnts).mean(axis = 0).astype(np.int64) # get origin
+    clock_ang_dist = clockwise_angle_and_distance(center_pt) # set origin
+    cnts = sorted(cnts, key=clock_ang_dist) # use to sort
+    cnts = np.asarray(cnts)
+
+    img = visual_json(data=area_cnts)
+    img = visual_contour(img,cnts)
+    img=cv2.circle(img ,tuple(center_pt),2,(0,0,255),4) #画出重心
+    cv2.imshow('img',img)
+    cv2.waitKey(0)
 
 
 def get_img_from_video(vid_path,frame_id=0,save_path=None):
@@ -266,7 +393,32 @@ def get_img_from_video(vid_path,frame_id=0,save_path=None):
 
     return frame
 
+def visual_json(img=None,data=None,file=None):
+    assert data is not None or file is not None
+    if data is None:
+        data = loadJson(file)
+    h,w = data['imgHeight'],data['imgWidth']
+    if img is None:
+        mask = np.zeros((h,w,3))
+    else:
+        mask = img.copy()
+    for i,(key,value) in enumerate(data.items()):
+        if key not in classes:
+            continue
+        cnt = np.array(data[key])
+        visual_mask = cv2.fillPoly(mask,[cnt],color=colors[i])
+    visual_mask = visual_mask.astype(np.uint8)
+    # cv2.imshow('img',visual_mask)
+    # cv2.waitKey(0)
+    return visual_mask
+
+def visual_contour(img,cnt,color=(127,127,127)):
+    cv2.drawContours(img,[cnt],-1,color,3)
+    return img
+
+
 if __name__ == "__main__":
-    vid_path = r"D:\my file\project\扶梯项目\鲁邦通数据\8mm_20220427163046407.mp4"
-    save_path = r"data/test.jpg"
-    get_img_from_video(vid_path,save_path=save_path,frame_id=14)
+    # vid_path = r"data\4mm_53.mp4"
+    # save_path = r"data/test.jpg"
+    # get_img_from_video(vid_path,save_path=save_path,frame_id=650)
+    get_larger_contour(loadJson('output/seg_result.json'))

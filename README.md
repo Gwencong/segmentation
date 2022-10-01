@@ -86,6 +86,14 @@ python3 deepstream/deepstream_segmentation.py
 </div>
 
 ## 4. 模型下载
+|           | FCN-HRNetW18 | 
+|  :----:   | :---------:  | 
+|   ONNX    | [ckpt](https://drive.google.com/file/d/19rpcMIet_YQW8pawn2_olfv9dhKBVs0t/view?usp=sharing)(37.2MB)|
+
+
+<details>
+<summary>Legacy Model</summary>
+
 &emsp;&emsp;注意：供下载的模型仅用15张图片训练，精度很差，仅供参考，TensorRT的权重文件仅适用于Jetson Xavier NX上，TensorRT 8.0.1.6 版本
 
 <p align="center"><font face="黑体" size=2.>表3 模型文件下载</font></p>
@@ -98,3 +106,5 @@ python3 deepstream/deepstream_segmentation.py
 | TensorRT|      [ckpt](https://drive.google.com/file/d/1-puwvDEvU9_9IilhMBaSNTwpFoYh2Fvu/view?usp=sharing)(68MB)    |     [ckpt](https://drive.google.com/file/d/1wrU6ciUNA0euWrrf3b8I8Rxgj9PYmt08/view?usp=sharing)(56.6MB)     |     [ckpt](https://drive.google.com/file/d/19V7H_Ws3SZ6sDMBBfE8AEAWv-j2qr9te/view?usp=sharing)(31MB)      |      [ckpt](https://drive.google.com/file/d/1RGh59r8vAqWQQNcUMAJjLAKyAhSNJM4v/view?usp=sharing)(25MB)     |
 
 </div>
+
+</details>

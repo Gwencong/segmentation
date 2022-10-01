@@ -98,13 +98,11 @@ def infer_onnx_video(video_path,onnx_path):
 
 if __name__ == "__main__":
 
-
     img_path = "data/test.jpg"
     onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
     infer_onnx(img_path,onnx_path)
 
-    # vid_path = r"data\down.mp4"
-    # vid_path = r"D:\my file\project\扶梯项目\自采集数据\50b6d76b9aa1ef95b5704a29d835f2b1.mp4"
+    # vid_path = r"data\4mm_53.mp4"
     # onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
     # infer_onnx_video(vid_path,onnx_path)
 
