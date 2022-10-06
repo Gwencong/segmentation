@@ -641,6 +641,8 @@ class ContourParse():
         return mask
 
 def get_cross_pts(contour, pt1, pt2):
+    def dis2d(pt1,pt2):
+        return np.sqrt((pt1[0]-pt2[0])**2+(pt1[1]-pt2[1])**2)
     cross_pts = []
     cross_dis = []
     for i,pt in enumerate(zip(*line(*pt1, *pt2))):
@@ -650,7 +652,15 @@ def get_cross_pts(contour, pt1, pt2):
         if abs(distance) < 1:  # 若点在轮廓上
             cross_pts.append(pt)
             cross_dis.append(abs(distance))
-    idx = np.argsort(cross_dis)[:2]
+    ids = np.argsort(cross_dis)
+    pt1 = cross_pts[ids[0]]
+    dis = 0
+    n = 1
+    while(dis<10 and n<len(ids)):
+        pt2 = cross_pts[ids[n]]
+        dis = dis2d(pt1,pt2)
+        n += 1
+    idx = [ids[0],ids[n-1]]
     cross_pts = np.array(cross_pts)[idx,...].reshape(-1,2)     
     if len(cross_pts)>=2:
         max_id = np.argmax(cross_pts[...,0])
