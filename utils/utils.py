@@ -230,7 +230,13 @@ def get_contour_approx(pred,img,visual=False):
                 cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
         else:
             print(f'no contour is found for class `{classes[i]}`')
+    cnts_l,cnts_xl = get_larger_step_v2(approxs)
+    # cnts_l,cnts_xl = get_larger_step(approxs)
+    approxs['large_step'] = cnts_l.tolist()
+    approxs['larger_step'] = cnts_xl.tolist()
     if visual:
+        img = visual_contour(img,cnts_l,color=(255,0,255))
+        img = visual_contour(img,cnts_xl,color=(255,255,0))
         cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
     return approxs
 
@@ -345,15 +351,30 @@ class ContourParse():
                     result = (y-self.b)/self.k
             return result
 
-    def __init__(self, contour, imgH=720, imgW=1280, clock_wise=True) -> None:
+        def judgeLR(self,x,y):
+            if self.k is None:
+                res = True if x < self.x_low else False
+            else:
+                out = y - self.k*x - self.b
+                if self.k > 0:
+                    res = True if out>0 else False
+                else:
+                    res = False if out>0 else True
+            return res
+
+
+    def __init__(self, contour, imgH=720, imgW=1280, clock_wise=True, cnt_type='step') -> None:
         self.contour = np.asarray(contour).reshape(-1,2)
         self.imgH = imgH
         self.imgW = imgW
         self.clock_wise = clock_wise
         self.pts_num = len(self.contour)
-        self.left_cnt,self.right_cnt = self.split_LR()
-        self.top_cnt,self.bot_cnt = self.split_TB()
-        self.left_cnt_v2,self.right_cnt_v2 = self.split_LR_v2()
+        self.cnt_type = cnt_type
+        # self.left_cnt,self.right_cnt = self.split_LR()
+        # self.top_cnt,self.bot_cnt = self.split_TB()
+        # self.left_cnt_v2,self.right_cnt_v2 = self.split_LR_v2()
+        self.left_cnt,self.left_ids, self.right_cnt,self.right_ids,\
+            self.top_cnt,self.top_ids, self.bot_cnt,self.bot_ids = self.split()
 
     def split_LR(self):
         top_id = np.argmin(self.contour[...,1])
@@ -401,8 +422,8 @@ class ContourParse():
     def split_TB(self):
         top_id = np.argmin(self.contour[...,1])
         bot_id = np.argmax(self.contour[...,1])
-        top_cnt = self.search_pt(self.contour,top_id)
-        bot_cnt = self.search_pt(self.contour,bot_id)
+        top_cnt,top_ids = self.search_pt(self.contour,top_id)
+        bot_cnt,bot_ids = self.search_pt(self.contour,bot_id)
         if self.clock_wise:
             if top_cnt[0][0] > top_cnt[-1][0]:
                 top_cnt = list(reversed(top_cnt))
@@ -417,51 +438,154 @@ class ContourParse():
         bot_cnt = np.array(bot_cnt)
         return top_cnt,bot_cnt
 
+    def split(self):
+        # 1.分割上下轮廓
+        top_id = np.argmin(self.contour[...,1])
+        bot_id = np.argmax(self.contour[...,1])
+        top_cnt,top_ids = self.search_pt(self.contour,top_id)
+        bot_cnt,bot_ids = self.search_pt(self.contour,bot_id)
+        if self.clock_wise:
+            if top_cnt[0][0] > top_cnt[-1][0]:
+                top_cnt = list(reversed(top_cnt))
+            if bot_cnt[0][0] < bot_cnt[-1][0]:
+                bot_cnt = list(reversed(bot_cnt))
+        else:
+            if top_cnt[0][0] < top_cnt[-1][0]:
+                top_cnt = list(reversed(top_cnt))
+            if bot_cnt[0][0] > bot_cnt[-1][0]:
+                bot_cnt = list(reversed(bot_cnt))
+        top_cnt = np.array(top_cnt)
+        bot_cnt = np.array(bot_cnt)
+
+        # 寻找轮廓中间线
+        top_center = np.mean(top_cnt[[0,-1],...],axis=0)
+        bot_center = np.mean(bot_cnt[[0,-1],...],axis=0)
+        cneter_line = self.Line(top_center,bot_center)
+
+        # 分割左右轮廓
+        if self.cnt_type == 'step':
+            exclude_ids = top_ids[1:-1]+bot_ids[1:-1]
+            lef_cnt,lef_ids = [],[]
+            rig_cnt,rig_ids = [],[]
+            for i in range(self.pts_num):
+                if i in exclude_ids:
+                    continue
+                x,y = self.contour[i]
+                if cneter_line.judgeLR(x,y):
+                    lef_cnt.append([x,y])
+                    lef_ids.append(i)
+                else:
+                    rig_cnt.append([x,y])
+                    rig_ids.append(i)
+            lef_cnt = np.array(lef_cnt)
+            rig_cnt = np.array(rig_cnt)
+            lef_ids,lef_cnt = self.reorder(lef_ids,lef_cnt)
+            rig_ids,rig_cnt = self.reorder(rig_ids,rig_cnt)
+        else:
+            max_id = np.max([top_id,bot_id])
+            min_id = np.min([top_id,bot_id])
+            cnt1_id = list(range(min_id,max_id+1))
+            cnt2_id = list(range(max_id,self.pts_num))+list(range(0,min_id+1))
+            cnt1 = self.contour[cnt1_id,...]
+            cnt2 = self.contour[cnt2_id,...]
+            
+            if self.judgeLR(cnt1[-1],cnt1[-2],cnt2[1]):
+                lef_cnt,rig_cnt = cnt1,cnt2
+                lef_ids,rig_ids = cnt1_id,cnt2_id
+            else:
+                lef_cnt,rig_cnt = cnt2,cnt1
+                lef_ids,rig_ids = cnt2_id,cnt1_id
+            lef_cnt,rig_cnt = lef_cnt.tolist(),rig_cnt.tolist()
+            if self.clock_wise:
+                if lef_cnt[0][1]<lef_cnt[-1][1]:
+                    lef_cnt = list(reversed(lef_cnt))
+                if rig_cnt[0][1]<rig_cnt[-1][1]:
+                    rig_cnt = list(reversed(rig_cnt))
+            else:
+                if lef_cnt[0][1]>lef_cnt[-1][1]:
+                    lef_cnt = list(reversed(lef_cnt))
+                if rig_cnt[0][1]>rig_cnt[-1][1]:
+                    rig_cnt = list(reversed(rig_cnt))
+            lef_cnt,rig_cnt = np.array(lef_cnt),np.array(rig_cnt)
+        return lef_cnt,lef_ids, rig_cnt,rig_ids, top_cnt,top_ids, bot_cnt,bot_ids
+
+    def judgeLR(self,pt0,pt1,pt2):
+        line1 = self.Line(pt0,pt1)
+        line2 = self.Line(pt0,pt2)
+        if line1.k is None and line2.k is not None:
+            lr = False if pt1[0]>pt0[0] else True
+        elif line1.k is not None and line2.k is None:
+            lr = True if pt2[0]>pt0[0] else False
+        elif line1.k is None and line2.k is None:
+            lr = False if pt1[0]>pt2[0] else True
+        else:
+            if pt1[1]<pt0[1] and pt2[1]<pt0[1]:
+                if line1.k * line2.k<0:
+                    lr = True if line1.k>line2.k else False
+                else:
+                    lr = False if line1.k>line2.k else True
+            else:
+                if line1.k * line2.k<0:
+                    lr = True if line1.k<line2.k else False
+                else:
+                    lr = False if line1.k<line2.k else True
+        return lr
+
     def search_pt(self,contour,pt_id,k0=0.577):
+        '''沿着一点搜索与之满足给定斜率的平行点'''
         start_pt = contour[pt_id]
         pts_num = len(contour)
         range_num = len(contour)-1
         if self.judge_clockwise(contour,pt_id):
+            # 判断轮廓点的顺序是顺时针还是逆时针
             left_range = self.cycle_range(pt_id-1,range_num,reverse=True,lenght=pts_num)
             right_range = self.cycle_range(pt_id+1,range_num,reverse=False,lenght=pts_num)
         else:
             left_range = self.cycle_range(pt_id+1,range_num,reverse=False,lenght=pts_num)
             right_range = self.cycle_range(pt_id-1,range_num,reverse=True,lenght=pts_num)
         
+        # 往给定点左边搜索
         pts_l = []
-        if pt_id > 0:
-            prev_k = None
-            for i in left_range:
-                k = self.compute_slope(start_pt, contour[i])
-                if prev_k is None: 
-                    prev_k = k 
-                if k is not None and abs(k) <= k0 and abs(k-prev_k) <= 0.267:
-                    pts_l.append(contour[i])
-                else:
-                    break
-                prev_k = k
+        pts_l_ids = []
+        prev_k = None
+        for i in left_range:
+            k = self.compute_slope(start_pt, contour[i])
+            if prev_k is None: 
+                prev_k = k 
+            if k is not None and abs(k) <= k0 and abs(k-prev_k) <= 0.267:
+                pts_l.append(contour[i])
+                pts_l_ids.append(i)
+            else:
+                break
+            prev_k = k
 
+        # 往给定点右边搜索
         pts_r = []
-        if pt_id < self.pts_num:
-            prev_k = None
-            for i in right_range:
-                k = self.compute_slope(start_pt, contour[i])
-                if prev_k is None: 
-                    prev_k = k 
-                if k is not None and abs(k) <= k0 and abs(k-prev_k) <= 0.267:
-                    pts_r.append(contour[i])
-                else:
-                    break
+        pts_r_ids = []
+        prev_k = None
+        for i in right_range:
+            k = self.compute_slope(start_pt, contour[i])
+            if prev_k is None: 
+                prev_k = k 
+            if k is not None and abs(k) <= k0 and abs(k-prev_k) <= 0.267:
+                pts_r.append(contour[i])
+                pts_r_ids.append(i)
+            else:
+                break
                
         if len(pts_l) != 0 and len(pts_r) == 0:
             pts = list(reversed([start_pt] + pts_l))
+            ids = list(reversed([pt_id] + pts_l_ids))
         elif len(pts_l) == 0 and len(pts_r) != 0:
             pts = [start_pt] + pts_r
+            ids = [pt_id] + pts_r_ids
         elif len(pts_l) != 0 and len(pts_r) != 0:
             pts = list(reversed([start_pt] + pts_l)) + pts_r
+            ids = list(reversed([pt_id] + pts_l_ids)) + pts_r_ids
         else:
             pts = [start_pt]
-        return pts
+            ids = [pt_id]
+        return pts,ids
 
     def judge_clockwise(self,contour,pt_id):
         start_pt = contour[pt_id]
@@ -472,6 +596,20 @@ class ContourParse():
         else:
             return False
 
+    def reorder(self,order,cnt):
+        diff = np.array(order[1:])-np.array(order[:-1])
+        invalid = False
+        for i,v in enumerate(diff):
+            if abs(v) != 1 or abs(v) != self.pts_num-1:
+                invalid = True
+                break
+        if invalid:
+            new_order = order[i+1:] + order[:i+1]
+            new_cnt = np.concatenate([cnt[i+1:,:],cnt[:i+1,:]],axis=0)
+        else:
+            new_order = order
+            new_cnt = cnt
+        return new_order,new_cnt
         
     def cycle_range(self,start,num,reverse=False,lenght=None):
         lenght = self.pts_num if lenght is None else lenght
@@ -520,38 +658,36 @@ def get_cross_pts(contour, pt1, pt2):
         cross_pts = cross_pts[[min_id,max_id],...]
     return cross_pts
 
-def get_larger_contour(area_cnts:dict):
+def get_larger_step(area_cnts:dict):
     assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
     
-    baffle_l = ContourParse(np.array(area_cnts[classes[0]]))
-    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False)
-    step = ContourParse(np.array(area_cnts[classes[2]]))
+    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='baffle')
+    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='baffle')
+    step = ContourParse(np.array(area_cnts[classes[2]]),clock_wise=True,cnt_type='step')
 
-    cnts = np.vstack((baffle_l.left_cnt, step.top_cnt, baffle_r.right_cnt, step.bot_cnt))
-    # cnts = np.vstack((baffle_l.right_cnt, step.top_cnt, baffle_r.left_cnt, step.bot_cnt))
-    center_pt = np.array(cnts).mean(axis = 0).astype(np.int64) # get origin
-    # clock_ang_dist = clockwise_angle_and_distance(center_pt) # set origin
-    # cnts = sorted(cnts, key=clock_ang_dist) # use to sort
-    cnts = np.asarray(cnts)
-
-    img = visual_json(data=area_cnts)
-    visual_contour(img,step.right_cnt_v2)
-    # img = visual_contour(img,cnts)
-    img = cv2.circle(img ,tuple(center_pt),2,(0,0,255),4) #画出重心
-    cv2.imshow('img',img)
-    cv2.waitKey(0)
+    cnts_l = np.vstack((baffle_l.right_cnt, step.top_cnt, baffle_r.left_cnt, step.bot_cnt))
+    cnts_xl = np.vstack((baffle_l.left_cnt, step.top_cnt, baffle_r.right_cnt, step.bot_cnt))
+    
+    # img = visual_json(data=area_cnts)
+    # img = visual_contour(img,baffle_r.left_cnt,draw_line=True)
+    # img = visual_contour(img,cnts_l,color=(127,127,127))
+    # img = visual_contour(img,cnts_xl,color=(200,200,200))
+    # cv2.imshow('img',img)
+    # cv2.waitKey(0)
+    return cnts_l,cnts_xl
 
 def get_larger_contour_v2(area_cnts:dict):
     assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
-    baffle_l = ContourParse(np.array(area_cnts[classes[0]]))
-    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False)
-    step = ContourParse(np.array(area_cnts[classes[2]]))
+    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='baffle')
+    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='baffle')
+    step = ContourParse(np.array(area_cnts[classes[2]]),clock_wise=True,cnt_type='step')
+
     img = visual_json(data=area_cnts)
     cnt = step.contour.copy()
     new_cnt = step.contour.copy()
 
     min_x = np.min(baffle_l.contour[...,0])-5
-    for pt in step.left_cnt_v2:
+    for pt in step.left_cnt:
         cross_pts = get_cross_pts(baffle_l.contour,pt,(min_x,pt[1]))
         new_pt = cross_pts[0]
         # img = cv2.circle(img ,tuple(new_pt),2,(0,0,255),4) #画出重心
@@ -564,7 +700,7 @@ def get_larger_contour_v2(area_cnts:dict):
                 break
         new_cnt[idx,...] = new_pt
     max_x = np.max(baffle_r.contour[...,0])+5
-    for pt in step.right_cnt_v2:
+    for pt in step.right_cnt:
         cross_pts = get_cross_pts(baffle_r.contour,pt,(max_x,pt[1]))
         new_pt = cross_pts[1]
         # img = cv2.circle(img ,tuple(new_pt),2,(0,0,255),4) #画出重心
@@ -582,6 +718,36 @@ def get_larger_contour_v2(area_cnts:dict):
     cv2.imshow('img',img)
     cv2.waitKey(0)
 
+def get_larger_step_v2(area_cnts:dict):
+    assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
+    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='baffle')
+    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='baffle')
+    step = ContourParse(np.array(area_cnts[classes[2]]),clock_wise=True,cnt_type='step')
+
+    cnts_l = step.contour.copy()
+    cnts_xl = step.contour.copy()
+
+    min_x = np.min(baffle_l.contour[...,0])-5
+    for pt,idx in zip(step.left_cnt,step.left_ids):
+        cross_pts = get_cross_pts(baffle_l.contour,pt,(min_x,pt[1]))
+        pt_l,pt_r = cross_pts[0],cross_pts[1]
+        cnts_l[idx,:] = pt_r
+        cnts_xl[idx,:] = pt_l
+        
+    max_x = np.max(baffle_r.contour[...,0])+5
+    for pt,idx in zip(step.right_cnt,step.right_ids):
+        cross_pts = get_cross_pts(baffle_r.contour,pt,(max_x,pt[1]))
+        pt_l,pt_r = cross_pts[0],cross_pts[1]
+        cnts_l[idx,:] = pt_l
+        cnts_xl[idx,:] = pt_r
+
+    # img = visual_json(data=area_cnts)
+    # img = visual_contour(img,cnts_l,color=(127,127,127))
+    # img = visual_contour(img,cnts_xl,color=(200,200,200))
+    # cv2.imshow('img',img)
+    # cv2.waitKey(0)
+
+    return cnts_l,cnts_xl
 
 def get_img_from_video(vid_path,frame_id=0,save_path=None):
     cap = cv2.VideoCapture(vid_path)
@@ -630,8 +796,14 @@ def visual_json(img=None,data=None,file=None):
     # cv2.waitKey(0)
     return visual_mask
 
-def visual_contour(img,cnt,color=(127,127,127)):
-    cv2.drawContours(img,[cnt],-1,color,3)
+def visual_contour(img,cnt,color=(127,127,127),draw_line=False):
+    if not draw_line:
+        cv2.drawContours(img,[cnt],-1,color,3)
+    else:
+        for (x1,y1),(x2,y2) in zip(cnt[1:,:],cnt[:-1,:]):
+            pt1 = (int(x1), int(y1))
+            pt2 = (int(x2), int(y2))
+            cv2.line(img,pt1,pt2,color,3,cv2.LINE_AA)
     return img
 
 
@@ -639,4 +811,6 @@ if __name__ == "__main__":
     # vid_path = r"data\4mm_53.mp4"
     # save_path = r"data/test.jpg"
     # get_img_from_video(vid_path,save_path=save_path,frame_id=650)
-    get_larger_contour_v2(loadJson('output/seg_result.json'))
+    # get_larger_step(loadJson('output/seg_result.json'))
+    get_larger_step_v2(loadJson('output/seg_result.json'))
+
