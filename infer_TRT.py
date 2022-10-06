@@ -6,7 +6,7 @@ import pycuda.autoinit
 import pycuda.driver as cuda
 
 from pathlib import Path
-from utils.utils import Timer,colorstr
+from utils.utils import Timer,colorstr,get_larger_step,get_larger_step_v2,visual_contour
 
 colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
 classes = ['left baffle','right baffle','step','floor plate','background']
@@ -100,7 +100,7 @@ class TRT_Infer():
         np.copyto(pagelocked_buffer, (img.astype(trt.nptype(trt.float32)).ravel()))
         return img
 
-    @Timer(10)
+    # @Timer(10)
     def inference(self,im,logits=False):
         # preprocess
         img = self.preprocess(im, self.inputs[0].host)
@@ -162,7 +162,13 @@ def get_contour_approx(pred,img,visual=False):
                 cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
         else:
             print(f'no contour is found for class `{classes[i]}`')
+    cnts_l,cnts_xl = get_larger_step_v2(approxs)
+    # cnts_l,cnts_xl = get_larger_step(approxs)
+    approxs['large_step'] = cnts_l.tolist()
+    approxs['larger_step'] = cnts_xl.tolist()
     if visual:
+        # img = visual_contour(img,cnts_l,color=(255,0,255))
+        # img = visual_contour(img,cnts_xl,color=(255,255,0))
         cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
     return approxs
 
