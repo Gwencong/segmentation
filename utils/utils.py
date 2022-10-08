@@ -9,7 +9,7 @@ import logging
 import platform
 import numpy as np
 from pathlib import Path
-from skimage.draw import line
+# from skimage.draw import line
 
 try:
     import gi
@@ -640,6 +640,84 @@ class ContourParse():
             cv2.imwrite('visual.jpg',mask)
         return mask
 
+def line(r0, c0, r1, c1):
+    """Generate line pixel coordinates.
+
+    Parameters
+    ----------
+    r0, c0 : int
+        Starting position (row, column).
+    r1, c1 : int
+        End position (row, column).
+
+    Returns
+    -------
+    rr, cc : (N,) ndarray of int
+        Indices of pixels that belong to the line.
+        May be used to directly index into an array, e.g.
+        ``img[rr, cc] = 1``.
+
+    Notes
+    -----
+    Anti-aliased line generator is available with `line_aa`.
+
+    Examples
+    --------
+    >>> from skimage.draw import line
+    >>> img = np.zeros((10, 10), dtype=np.uint8)
+    >>> rr, cc = line(1, 1, 8, 8)
+    >>> img[rr, cc] = 1
+    >>> img
+    array([[0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 1, 0, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+           [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], dtype=uint8)
+    """
+
+    steep = 0
+    r = r0
+    c = c0
+    dr = abs(r1 - r0)
+    dc = abs(c1 - c0)
+
+    rr = np.zeros(max(dc, dr) + 1, dtype=np.intp)
+    cc = np.zeros(max(dc, dr) + 1, dtype=np.intp)
+
+    sc = 1 if (c1 - c) > 0 else -1
+    sr = 1 if (r1 - r) > 0 else -1
+    
+    if dr > dc:
+        steep = 1
+        c, r = r, c
+        dc, dr = dr, dc
+        sc, sr = sr, sc
+    d = (2 * dr) - dc
+
+    for i in range(dc):
+        if steep:
+            rr[i] = c
+            cc[i] = r
+        else:
+            rr[i] = r
+            cc[i] = c
+        while d >= 0:
+            r = r + sr
+            d = d - (2 * dc)
+        c = c + sc
+        d = d + (2 * dr)
+
+    rr[dc] = r1
+    cc[dc] = c1
+
+    return np.asarray(rr), np.asarray(cc)
+
+
 def get_cross_pts(contour, pt1, pt2):
     def dis2d(pt1,pt2):
         return np.sqrt((pt1[0]-pt2[0])**2+(pt1[1]-pt2[1])**2)
@@ -823,4 +901,7 @@ if __name__ == "__main__":
     # get_img_from_video(vid_path,save_path=save_path,frame_id=650)
     # get_larger_step(loadJson('output/seg_result.json'))
     get_larger_step_v2(loadJson('output/seg_result.json'))
+    # rr,cc = line(0,0,4,4)
+    # print(rr)
+    # print(cc)
 
