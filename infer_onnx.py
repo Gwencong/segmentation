@@ -56,7 +56,7 @@ def infer_onnx(img_path,onnx_path):
     cv2.imwrite('output/out_onnx_mask.jpg',color_pred)
     cv2.imwrite('output/out_onnx_fuse.jpg',im)
 
-def infer_onnx_video(video_path,onnx_path):
+def infer_onnx_video(video_path,onnx_path,save_vid=False,save_name=None):
     import time
     onnx_model = onnx.load(onnx_path)
     onnx.checker.check_model(onnx_model)
@@ -67,8 +67,11 @@ def infer_onnx_video(video_path,onnx_path):
     frame_width  = int(cap.get(3))
     frame_height = int(cap.get(4))
     frame_count  = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    frame_fps    = cap.get(5)
+    frame_fps    = int(cap.get(5))
     print('frame width: {}\nframe height: {}\nframe count {}\nFPS: {}'.format(frame_width,frame_height,frame_count,frame_fps))
+    if save_vid:
+        save_name = 'output/out.avi' if save_name is None else save_name
+        vid_writer = cv2.VideoWriter(save_name,cv2.VideoWriter_fourcc(*'XVID'),frame_fps,(frame_width,frame_height))
 
     stillgo,frame = cap.read()
     count = 0
@@ -82,29 +85,33 @@ def infer_onnx_video(video_path,onnx_path):
 
         approxs = get_contour_approx(pred,frame,visual=True)  # get contour points of roi area from segment result
         approxs.update(**{'imgHeight':frame.shape[0],'imgWidth':frame.shape[1]})
-        result2json(approxs,'output/seg_result.json')       # save result to json file
+        if not save_vid:
+            result2json(approxs,'output/seg_result.json')       # save result to json file
 
         frame = cv2.addWeighted(frame,0.7,color_pred,0.3,0)
 
-        cv2.imshow('img',cv2.resize(frame,(0,0),fx=0.7,fy=0.7))
-        rest = max(1/frame_fps - (time.time()-start),1)
-        k = cv2.waitKey(rest) & 0xff
-        if k == 27:
-            break
+        if save_vid:
+            vid_writer.write(frame)
+        else:
+            cv2.imshow('img',cv2.resize(frame,(0,0),fx=0.7,fy=0.7))
+            rest = max(1/frame_fps - (time.time()-start),1)
+            k = cv2.waitKey(rest) & 0xff
+            if k == 27:
+                break
         
         stillgo,frame = cap.read()
         count += 1
-
+    result2json(approxs,'output/seg_result.json')       # save result to json file
 
 if __name__ == "__main__":
 
-    img_path = "data/test04.jpg"
-    onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
-    infer_onnx(img_path,onnx_path)
-
-    # vid_path = r"data\4mm_53.mp4"
+    # img_path = "data/test.jpg"
     # onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
-    # infer_onnx_video(vid_path,onnx_path)
+    # infer_onnx(img_path,onnx_path)
+
+    vid_path = r"data\4mm_14.mp4"
+    onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
+    infer_onnx_video(vid_path,onnx_path,save_vid=True,save_name='output/out.avi')
 
     # img_path = r'D:\my file\project\扶梯项目\code\OpticalFlow-DirectionJudge\data\test.jpg'
     # onnx_path = r"D:\my file\project\扶梯项目\code\segmentation\weights\fcn_hrnetw18.onnx"
