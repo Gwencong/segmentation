@@ -287,19 +287,34 @@ class ContourParse():
 
         # 分割左右轮廓
         if self.cnt_type == 'step':
-            exclude_ids = top_ids[1:-1]+bot_ids[1:-1]
+            # exclude_ids = top_ids[1:-1]+bot_ids[1:-1]
+            exclude_ids = []
+            if len(top_ids) == 1 and len(bot_ids) > 1:
+                exclude_ids += bot_ids[1:-1]
+            elif len(top_ids) > 1 and len(bot_ids) == 1:
+                exclude_ids += top_ids[1:-1]
+            elif len(top_ids) == 1 and len(bot_ids) == 1:
+                exclude_ids += []
+            else:
+                exclude_ids = top_ids[1:-1]+bot_ids[1:-1]
             lef_cnt,lef_ids = [],[]
             rig_cnt,rig_ids = [],[]
             for i in range(self.pts_num):
                 if i in exclude_ids:
                     continue
                 x,y = self.contour[i]
-                if cneter_line.judgeLR(x,y):
+                if (i in top_ids and len(top_ids)==1) or (i in bot_ids and len(bot_ids)==1):
                     lef_cnt.append([x,y])
                     lef_ids.append(i)
-                else:
                     rig_cnt.append([x,y])
                     rig_ids.append(i)
+                else:
+                    if cneter_line.judgeLR(x,y):
+                        lef_cnt.append([x,y])
+                        lef_ids.append(i)
+                    else:
+                        rig_cnt.append([x,y])
+                        rig_ids.append(i)
             lef_cnt = np.array(lef_cnt)
             rig_cnt = np.array(rig_cnt)
             lef_ids,lef_cnt = self.reorder(lef_ids,lef_cnt)
@@ -423,7 +438,7 @@ class ContourParse():
         diff = np.array(order[1:])-np.array(order[:-1])
         invalid = False
         for i,v in enumerate(diff):
-            if abs(v) != 1 or abs(v) != self.pts_num-1:
+            if abs(v) != 1 and abs(v) != self.pts_num-1:
                 invalid = True
                 break
         if invalid:
@@ -476,6 +491,8 @@ def get_cross_pts(contour, pt1, pt2):
             cross_pts.append(pt)
             cross_dis.append(abs(distance))
     ids = np.argsort(cross_dis)
+    if len(ids) == 0:
+        return np.asarray(cross_pts).reshape(-1,2)
     pt1 = cross_pts[ids[0]]
     dis = 0
     n = 1
@@ -520,18 +537,25 @@ def get_larger_step_v2(area_cnts:dict):
     cnts_xl = step.contour.copy()
 
     min_x = np.min(baffle_l.contour[...,0])-5
+    max_x = np.max(baffle_l.contour[...,0])+5
     for pt,idx in zip(step.left_cnt,step.left_ids):
-        cross_pts = get_cross_pts(baffle_l.contour,pt,(min_x,pt[1]))
-        pt_l,pt_r = cross_pts[0],cross_pts[1]
-        cnts_l[idx,:] = pt_r
-        cnts_xl[idx,:] = pt_l
-        
+        pt_tmp = (max(pt[0],max_x),pt[1])
+        cross_pts = get_cross_pts(baffle_l.contour,pt_tmp,(min_x,pt[1]))
+        if len(cross_pts)>0:
+            pt_l,pt_r = cross_pts[0],cross_pts[1]
+            cnts_l[idx,:] = pt_r
+            cnts_xl[idx,:] = pt_l
+
+    min_x = np.min(baffle_r.contour[...,0])-5 
     max_x = np.max(baffle_r.contour[...,0])+5
     for pt,idx in zip(step.right_cnt,step.right_ids):
-        cross_pts = get_cross_pts(baffle_r.contour,pt,(max_x,pt[1]))
-        pt_l,pt_r = cross_pts[0],cross_pts[1]
-        cnts_l[idx,:] = pt_l
-        cnts_xl[idx,:] = pt_r
+        pt_tmp = (min(pt[0],min_x),pt[1])
+        cross_pts = get_cross_pts(baffle_r.contour,pt_tmp,(max_x,pt[1]))
+        if len(cross_pts)>0:
+            pt_l,pt_r = cross_pts[0],cross_pts[1]
+            cnts_l[idx,:] = pt_l
+            cnts_xl[idx,:] = pt_r
+
 
     # img = visual_json(data=area_cnts)
     # img = visual_contour(img,cnts_l,color=(127,127,127))
