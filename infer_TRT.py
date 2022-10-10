@@ -6,7 +6,7 @@ import pycuda.autoinit
 import pycuda.driver as cuda
 
 from pathlib import Path
-from utils.utils import Timer,colorstr,get_larger_step,get_larger_step_v2,visual_contour
+from utils.utils import Timer,colorstr,get_larger_step,get_larger_step_v2,get_larger_floor,visual_contour
 
 colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
 classes = ['left baffle','right baffle','step','floor plate','background']
@@ -130,11 +130,13 @@ class TRT_Infer():
         return pred, color_pred
 
 
-def get_contour_approx(pred,img,visual=False):
+def get_contour_approx(pred,img,visual=False,add_pixel=30):
     '''根据预测的mask获取扶梯左右挡板、梯路的轮廓\n
     Args:
-        pred: 预测的mask, 尺寸: [H,W], 每个像素的值为0-3, 对于类别id
+        pred: 预测的mask, 尺寸: [H,W], 每个像素的值为0-4, 对于类别id
         img: 原图, 可视化用
+        visual: 将结果可视化
+        add_pixel: 向下扩大楼层板的像素值
     Return: 
         approxs: 获取到的轮廓点集, list, 有三个元素, 对应左右挡板和梯路的区域轮廓
     '''
@@ -164,11 +166,14 @@ def get_contour_approx(pred,img,visual=False):
             print(f'no contour is found for class `{classes[i]}`')
     cnts_l,cnts_xl = get_larger_step_v2(approxs)
     # cnts_l,cnts_xl = get_larger_step(approxs)
+    cnts_l_floor = get_larger_floor(approxs,add_pixel)
     approxs['large_step'] = cnts_l.tolist()
     approxs['larger_step'] = cnts_xl.tolist()
+    approxs['larger_floor'] = cnts_l_floor.tolist()
     if visual:
-        # img = visual_contour(img,cnts_l,color=(255,0,255))
-        # img = visual_contour(img,cnts_xl,color=(255,255,0))
+        img = visual_contour(img,cnts_l,color=(255,0,255))
+        img = visual_contour(img,cnts_xl,color=(255,255,0))
+        img = visual_contour(img,cnts_l_floor,color=(255,127,127))
         cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
     return approxs
 

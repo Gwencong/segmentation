@@ -564,6 +564,35 @@ def get_larger_step_v2(area_cnts:dict):
 
     return cnts_l,cnts_xl
 
+def get_larger_floor(area_cnts:dict,add_pixel=30):
+    assert 'floor plate' in area_cnts,f'floor plate not found'
+    if "imgHeight" not in area_cnts or "imgWidth" not in area_cnts:
+        imgH,imgW = 720,1280
+    else:
+        imgH,imgW = area_cnts["imgHeight"],area_cnts["imgWidth"]
+    floor_plate = ContourParse(np.array(area_cnts[classes[3]]),clock_wise=True,cnt_type='step')
+    cnts = floor_plate.contour.copy()
+    cnts_l = floor_plate.contour.copy()
+    x_min,x_max = np.min(cnts[:,0]),np.max(cnts[:,0])
+    y_min,y_max = np.min(cnts[:,1]),np.max(cnts[:,1])
+    supply = int((y_max-y_min)/10)
+    moments = cv2.moments(cnts)             # 求矩
+    cx = int(moments['m10']/moments['m00']) # 求x坐标
+    cy = int(moments['m01']/moments['m00']) # 求y坐标
+    for i,pt in enumerate(cnts):
+        x,y = pt[0],pt[1]
+        if y>=cy+supply:
+            cnts_l[i] = np.asarray([x,np.clip(y+add_pixel,0,imgH-1)])
+    
+    # img = visual_json(data=area_cnts)
+    # img = visual_contour(img,cnts_l,color=(200,200,200))
+    # img = cv2.circle(img ,(cx,cy+supply),2,(0,0,255),4) #画出重心
+    # cv2.imshow('img',img)
+    # cv2.waitKey(0)
+
+    return cnts_l
+
+
 def loadJson(file):
     assert os.path.exists(file),f'file not exist: `{file}`'
     with open(file,'r',encoding='utf-8') as f:
