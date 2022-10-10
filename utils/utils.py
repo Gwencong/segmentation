@@ -19,8 +19,8 @@ except Exception as e:
     print(repr(e))
 
 
-SEG_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [0, 0, 0]]
-colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255],[0, 0, 0]]
+SEG_COLORS = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
+colors = [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255,255,0], [0, 0, 0]]
 classes = ['left baffle','right baffle','step','floor plate','background']
 train_id_to_color = np.array(colors)
 train_id_to_color = np.ascontiguousarray(train_id_to_color)
@@ -231,11 +231,14 @@ def get_contour_approx(pred,img,visual=False):
             print(f'no contour is found for class `{classes[i]}`')
     cnts_l,cnts_xl = get_larger_step_v2(approxs)
     # cnts_l,cnts_xl = get_larger_step(approxs)
+    cnts_l_floor = get_larger_floor(approxs)
     approxs['large_step'] = cnts_l.tolist()
     approxs['larger_step'] = cnts_xl.tolist()
+    approxs['larger_floor'] = cnts_l_floor.tolist()
     if visual:
         img = visual_contour(img,cnts_l,color=(255,0,255))
         img = visual_contour(img,cnts_xl,color=(255,255,0))
+        img = visual_contour(img,cnts_l_floor,color=(255,127,127))
         cv2.imwrite('output/out-trt-aprroxs.jpg',img) 
     return approxs
 
@@ -860,6 +863,35 @@ def get_larger_step_v2(area_cnts:dict):
 
     return cnts_l,cnts_xl
 
+def get_larger_floor(area_cnts:dict,add_pixel=30):
+    assert 'floor plate' in area_cnts,f'floor plate not found'
+    if "imgHeight" not in area_cnts or "imgWidth" not in area_cnts:
+        imgH,imgW = 720,1280
+    else:
+        imgH,imgW = area_cnts["imgHeight"],area_cnts["imgWidth"]
+    floor_plate = ContourParse(np.array(area_cnts[classes[3]]),clock_wise=True,cnt_type='step')
+    cnts = floor_plate.contour.copy()
+    cnts_l = floor_plate.contour.copy()
+    x_min,x_max = np.min(cnts[:,0]),np.max(cnts[:,0])
+    y_min,y_max = np.min(cnts[:,1]),np.max(cnts[:,1])
+    supply = int((y_max-y_min)/10)
+    moments = cv2.moments(cnts)             # 求矩
+    cx = int(moments['m10']/moments['m00']) # 求x坐标
+    cy = int(moments['m01']/moments['m00']) # 求y坐标
+    for i,pt in enumerate(cnts):
+        x,y = pt[0],pt[1]
+        if y>=cy+supply:
+            cnts_l[i] = np.asarray([x,np.clip(y+add_pixel,0,imgH-1)])
+    
+    img = visual_json(data=area_cnts)
+    img = visual_contour(img,cnts_l,color=(200,200,200))
+    img = cv2.circle(img ,(cx,cy+supply),2,(0,0,255),4) #画出重心
+    cv2.imshow('img',img)
+    cv2.waitKey(0)
+
+    return cnts_l
+
+
 def get_img_from_video(vid_path,frame_id=0,save_path=None):
     cap = cv2.VideoCapture(vid_path)
 
@@ -919,10 +951,11 @@ def visual_contour(img,cnt,color=(127,127,127),draw_line=False):
 
 
 if __name__ == "__main__":
-    # vid_path = r"data\4mm_scenario1_1.mp4"
+    # vid_path = r"data\4mm_07.mp4"
     # save_path = r"data/test.jpg"
-    # get_img_from_video(vid_path,save_path=save_path,frame_id=522)
+    # get_img_from_video(vid_path,save_path=save_path,frame_id=10)
     # get_larger_step(loadJson('output/seg_result.json'))
-    get_larger_step_v2(loadJson('output/seg_result.json'))
+    # get_larger_step_v2(loadJson('output/seg_result.json'))
+    get_larger_floor(loadJson('output/seg_result.json'))
 
 

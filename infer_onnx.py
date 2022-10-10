@@ -75,6 +75,7 @@ def infer_onnx_video(video_path,onnx_path,save_vid=False,save_name=None):
 
     stillgo,frame = cap.read()
     count = 0
+    approxs = []
     while stillgo:
         start = time.time()
         print(count)
@@ -105,13 +106,13 @@ def infer_onnx_video(video_path,onnx_path,save_vid=False,save_name=None):
 
 if __name__ == "__main__":
 
-    # img_path = "data/test.jpg"
-    # onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
-    # infer_onnx(img_path,onnx_path)
-
-    vid_path = r"data\4mm_14.mp4"
+    img_path = "data/test.jpg"
     onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
-    infer_onnx_video(vid_path,onnx_path,save_vid=True,save_name='output/out.avi')
+    infer_onnx(img_path,onnx_path)
+
+    # vid_path = r"data\4mm_07.mp4"
+    # onnx_path = "weights/fcn_hrnetw18_dynamic.onnx"
+    # infer_onnx_video(vid_path,onnx_path,save_vid=True,save_name='output/out.avi')
 
     # img_path = r'D:\my file\project\扶梯项目\code\OpticalFlow-DirectionJudge\data\test.jpg'
     # onnx_path = r"D:\my file\project\扶梯项目\code\segmentation\weights\fcn_hrnetw18.onnx"
