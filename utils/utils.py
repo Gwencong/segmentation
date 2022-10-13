@@ -883,11 +883,11 @@ def get_larger_floor(area_cnts:dict,add_pixel=30):
         if y>=cy+supply:
             cnts_l[i] = np.asarray([x,np.clip(y+add_pixel,0,imgH-1)])
     
-    img = visual_json(data=area_cnts)
-    img = visual_contour(img,cnts_l,color=(200,200,200))
-    img = cv2.circle(img ,(cx,cy+supply),2,(0,0,255),4) #画出重心
-    cv2.imshow('img',img)
-    cv2.waitKey(0)
+    # img = visual_json(data=area_cnts)
+    # img = visual_contour(img,cnts_l,color=(200,200,200))
+    # img = cv2.circle(img ,(cx,cy+supply),2,(0,0,255),4) #画出重心
+    # cv2.imshow('img',img)
+    # cv2.waitKey(0)
 
     return cnts_l
 
@@ -951,11 +951,11 @@ def visual_contour(img,cnt,color=(127,127,127),draw_line=False):
 
 
 if __name__ == "__main__":
-    # vid_path = r"data\4mm_07.mp4"
-    # save_path = r"data/test.jpg"
-    # get_img_from_video(vid_path,save_path=save_path,frame_id=10)
+    vid_path = r"data\4mm_10.mp4"
+    save_path = r"data/test.jpg"
+    get_img_from_video(vid_path,save_path=save_path,frame_id=0)
     # get_larger_step(loadJson('output/seg_result.json'))
     # get_larger_step_v2(loadJson('output/seg_result.json'))
-    get_larger_floor(loadJson('output/seg_result.json'))
+    # get_larger_floor(loadJson('output/seg_result.json'))
 
 
