@@ -164,8 +164,8 @@ def get_contour_approx(pred,img,visual=False,add_pixel=30):
                 cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
         else:
             print(f'no contour is found for class `{classes[i]}`')
-    cnts_l,cnts_xl = get_larger_step_v2(approxs)
-    # cnts_l,cnts_xl = get_larger_step(approxs)
+    # cnts_l,cnts_xl = get_larger_step_v2(approxs)
+    cnts_l,cnts_xl = get_larger_step(approxs)
     cnts_l_floor = get_larger_floor(approxs,add_pixel)
     approxs['large_step'] = cnts_l.tolist()
     approxs['larger_step'] = cnts_xl.tolist()
