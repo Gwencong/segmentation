@@ -320,6 +320,8 @@ class ContourParse():
             lef_ids,lef_cnt = self.reorder(lef_ids,lef_cnt)
             rig_ids,rig_cnt = self.reorder(rig_ids,rig_cnt)
         else:
+            top_id = self.update_id(top_id,self.contour)
+            bot_id = self.update_id(bot_id,self.contour)
             max_id = np.max([top_id,bot_id])
             min_id = np.min([top_id,bot_id])
             cnt1_id = list(range(min_id,max_id+1))
@@ -346,6 +348,19 @@ class ContourParse():
                     rig_cnt = list(reversed(rig_cnt))
             lef_cnt,rig_cnt = np.array(lef_cnt),np.array(rig_cnt)
         return lef_cnt,lef_ids, rig_cnt,rig_ids, top_cnt,top_ids, bot_cnt,bot_ids
+
+    def update_id(self, idx, contour, thres=10):
+        new_idx = idx
+        x,y = contour[idx,:]
+        indices = np.argwhere(np.abs(contour[:,1]-y)<thres).reshape(-1)
+        if len(indices)>1:
+            pts = contour[indices,:]
+            if self.cnt_type == 'left baffle':
+                new_idx = np.argmax(pts[:,0])
+            else:
+                new_idx = np.argmin(pts[:,0])
+            new_idx = indices[new_idx]
+        return new_idx
 
     def judgeLR(self,pt0,pt1,pt2):
         line1 = self.Line(pt0,pt1)
@@ -511,8 +526,8 @@ def get_cross_pts(contour, pt1, pt2):
 def get_larger_step(area_cnts:dict):
     assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
     
-    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='baffle')
-    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='baffle')
+    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='left baffle')
+    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='right baffle')
     step = ContourParse(np.array(area_cnts[classes[2]]),clock_wise=True,cnt_type='step')
 
     cnts_l = np.vstack((baffle_l.right_cnt, step.top_cnt, baffle_r.left_cnt, step.bot_cnt))
