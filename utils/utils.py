@@ -229,8 +229,8 @@ def get_contour_approx(pred,img,visual=False):
                 cv2.drawContours(img,[approx],-1,(0,255,255),thickness=4)
         else:
             print(f'no contour is found for class `{classes[i]}`')
-    cnts_l,cnts_xl = get_larger_step_v2(approxs)
-    # cnts_l,cnts_xl = get_larger_step(approxs)
+    # cnts_l,cnts_xl = get_larger_step_v2(approxs)
+    cnts_l,cnts_xl = get_larger_step(approxs)
     cnts_l_floor = get_larger_floor(approxs)
     approxs['large_step'] = cnts_l.tolist()
     approxs['larger_step'] = cnts_xl.tolist()
@@ -498,6 +498,8 @@ class ContourParse():
             lef_ids,lef_cnt = self.reorder(lef_ids,lef_cnt)
             rig_ids,rig_cnt = self.reorder(rig_ids,rig_cnt)
         else:
+            top_id = self.update_id(top_id,self.contour)
+            bot_id = self.update_id(bot_id,self.contour)
             max_id = np.max([top_id,bot_id])
             min_id = np.min([top_id,bot_id])
             cnt1_id = list(range(min_id,max_id+1))
@@ -644,6 +646,19 @@ class ContourParse():
             slope = (pt1[1]-pt2[1])/(pt1[0]-pt2[0])
         return slope
 
+    def update_id(self, idx, contour, thres=10):
+        new_idx = idx
+        x,y = contour[idx,:]
+        indices = np.argwhere(np.abs(contour[:,1]-y)<thres).reshape(-1)
+        if len(indices)>1:
+            pts = contour[indices,:]
+            if self.cnt_type == 'left baffle':
+                new_idx = np.argmax(pts[:,0])
+            else:
+                new_idx = np.argmin(pts[:,0])
+            new_idx = indices[new_idx]
+        return new_idx
+
     def visual(self,contour=None,img=None):
         if contour is None:
             contour = self.contour
@@ -767,8 +782,8 @@ def get_cross_pts(contour, pt1, pt2):
 def get_larger_step(area_cnts:dict):
     assert sum(key in area_cnts.keys() for key in classes[:3]),f'some key not found'
     
-    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='baffle')
-    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='baffle')
+    baffle_l = ContourParse(np.array(area_cnts[classes[0]]),clock_wise=True,cnt_type='left baffle')
+    baffle_r = ContourParse(np.array(area_cnts[classes[1]]),clock_wise=False,cnt_type='right baffle')
     step = ContourParse(np.array(area_cnts[classes[2]]),clock_wise=True,cnt_type='step')
 
     cnts_l = np.vstack((baffle_l.right_cnt, step.top_cnt, baffle_r.left_cnt, step.bot_cnt))
@@ -949,13 +964,26 @@ def visual_contour(img,cnt,color=(127,127,127),draw_line=False):
             cv2.line(img,pt1,pt2,color,3,cv2.LINE_AA)
     return img
 
+def fill_cnt(area_cnts):
+    cnt = np.array(area_cnts['large_step'])
+    try:
+        imgH,imgW = area_cnts['imgHeight'],area_cnts['imgWidth']
+    except Exception as e:
+        print(repr(e))
+        imgH,imgW = 720,1280
+    mask = np.zeros((imgH,imgW,3))
+    cv2.fillPoly(mask,[cnt],color=(200,200,0))
+    cv2.drawContours(mask,[cnt],-1,(255,255,255),3)
+    cv2.imshow('img',mask)
+    cv2.waitKey(0)
 
 if __name__ == "__main__":
-    vid_path = r"data\4mm_10.mp4"
-    save_path = r"data/test.jpg"
-    get_img_from_video(vid_path,save_path=save_path,frame_id=0)
-    # get_larger_step(loadJson('output/seg_result.json'))
+    # vid_path = r"data\4mm_10.mp4"
+    # save_path = r"data/test.jpg"
+    # get_img_from_video(vid_path,save_path=save_path,frame_id=0)
+    get_larger_step(loadJson('output/Seg0(1).json'))
     # get_larger_step_v2(loadJson('output/seg_result.json'))
     # get_larger_floor(loadJson('output/seg_result.json'))
-
+    # visual_json(file=r"output/Seg0(1).json")
+    # fill_cnt(loadJson('output/Seg0(1).json'))
 
