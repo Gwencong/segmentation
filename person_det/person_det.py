@@ -321,7 +321,7 @@ class PersonCounter:
         self.debug = debug
         self.PersonDet = Pose_TRT(weight,input_shape=None,conf=0.4,iou=0.5)
         self.parse_video(vidPath)
-        Path(saveDir).parent.mkdir(parents=True,exist_ok=True)
+        Path(saveDir).mkdir(parents=True,exist_ok=True)
 
         if debug:
             vid_fourcc = cv2.VideoWriter_fourcc("m", "p", "4", "v")
@@ -356,11 +356,11 @@ class PersonCounter:
             self.frame += 1
             img = im.copy()
             
-            boxes, confs, kpts = self.PersonDet(img)
-            if len(boxes) == 0:
+            boxes, confs, kpts = self.PersonDet(img,self.debug)
+            if (len(boxes) == 0) and (noPerson < self.imgNum):
                 img_name = f'{self.vid_name}_{self.frame}.jpg'
                 img_path = os.path.join(self.saveDir,img_name)
-                cv2.imwrite(im, img_path)
+                cv2.imwrite(img_path, im)
                 noPerson += 1
                 noPersonImg.append(im)
             if self.debug:
@@ -372,7 +372,7 @@ class PersonCounter:
             pbar.set_description(F'[{noPerson}/{self.imgNum}] avgFPS:{avgFPS}, FPS:{FPS}, PersonNum:{len(boxes)}')
             pbar.update()
 
-            if noPerson >= self.imgNum:
+            if (noPerson >= self.imgNum) and not self.debug:
                 break
         pbar.close()
         if noPerson < self.imgNum:
@@ -538,11 +538,11 @@ def sample02():
     vid_writer.release()
 
 def sample03():
-    weight = ''
-    imgNum = 10
-    vidPath = ''
-    saveDir = 'output/imgs'
-    counter = PersonCounter(weight,imgNum,vidPath,saveDir,debug=False)
+    weight = 'weights/yolov5l6_pose_mix-dynamic-FP16.trt'
+    imgNum = 5
+    vidPath = 'data/4mm_12.mp4'
+    saveDir = 'data/imgs'
+    counter = PersonCounter(weight,imgNum,vidPath,saveDir,debug=True)
     noPersonImgs = counter.getNoPerson()
 
 if __name__ == "__main__":
