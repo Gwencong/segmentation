@@ -1,3 +1,4 @@
+import os
 import json
 import cv2
 import numpy as np
@@ -243,6 +244,41 @@ def infer_trt_multi(imgs,model_path,mode='mean'):
     img = cv2.addWeighted(vis_img,0.7,color_mask,0.3,0)
     cv2.imwrite('output/out_trt_mask.jpg',color_mask)
     cv2.imwrite('output/out_trt_fuse.jpg',img)
+
+def autoAdjust(file,inplace=False,add_pixel=30):
+    '''对人工校正后的分割结果自动计算'large_step','larger_step','larger_floor'
+
+    # Arguments:
+       file: 人工校正分割结果后的json文件路径 
+       inplace: 是否原地修改json文件
+       add_pixel: 向下扩大楼层板的像素值
+
+    # Return:
+        None
+
+    # Examples
+    >>> file = 'recorrected_seg.json'
+    >>> autoAdjust(file,inplace=False,add_pixel=30)
+    '''
+    ## load hand tuned sementation result from json file path
+    assert os.path.exists(file),f'file not exist: `{file}`'
+    with open(file,'r',encoding='utf-8') as f:
+        contours_dict = json.load(f)
+    
+    ## adjust large_step, larger_step, larger_floor
+    cnts_l,cnts_xl = get_larger_step(contours_dict)
+    cnts_l_floor = get_larger_floor(contours_dict,add_pixel)
+    contours_dict['large_step'] = cnts_l.tolist()
+    contours_dict['larger_step'] = cnts_xl.tolist()
+    contours_dict['larger_floor'] = cnts_l_floor.tolist()
+    
+    ## save
+    if inplace:
+        new_file = file
+    else:
+        new_file = file.replace('.json', '_adjusted.json')
+    result2json(contours_dict,new_file)
+    
 
 
 
